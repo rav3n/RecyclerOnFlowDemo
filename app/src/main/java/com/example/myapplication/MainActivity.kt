@@ -2,6 +2,7 @@ package com.example.myapplication
 
 import android.os.Bundle
 import android.util.Log
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
@@ -13,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -45,6 +47,7 @@ class MainActivity : AppCompatActivity() {
 
 class CustomAdapter: RecyclerView.Adapter<CustomAdapter.VH>() {
 
+    private val scope = CoroutineScope(Job() + Dispatchers.Main)
     private val jobList = mutableMapOf<String, Job>()
 
     class VH(view: View, private val scope: CoroutineScope, private val jobs: MutableMap<String, Job>) : ViewHolder(view) {
@@ -54,14 +57,21 @@ class CustomAdapter: RecyclerView.Adapter<CustomAdapter.VH>() {
                 val key = hashCode().toString()
                 jobs[key]?.cancel()
                 jobs[key] = scope.launch {
-                    MainActivity.flowData .collect { data -> if (data != null) text = "$position $data" }
+                    MainActivity.flowData .collect { data ->
+                        if (data != null) text = "$position $data"
+                        Log.d(CustomAdapter::class.java.name, "tik positions updated $position")
+                    }
                 }
                 Log.d(CustomAdapter::class.java.name, "jobs count $key ${jobs.size}")
             }
         }
     }
 
-    private val scope = CoroutineScope(Job() + Dispatchers.Main)
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        scope.cancel()
+        Log.d(CustomAdapter::class.java.name, "cancel")
+        super.onDetachedFromRecyclerView(recyclerView)
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
 
@@ -69,7 +79,9 @@ class CustomAdapter: RecyclerView.Adapter<CustomAdapter.VH>() {
 
         return VH(TextView(parent.context).apply {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 300)
+            gravity = Gravity.CENTER
             val value = rand.nextFloat()
+            setTextColor(rgb(1 - value, 1 - value, 1 - value))
             setBackgroundColor(rgb(value, value, value))
         }, scope, jobList)
     }
